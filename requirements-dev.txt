@@ -1,0 +1,5 @@
+# 开发依赖
+fastapi>=0.110
+uvicorn>=0.27
+pytest>=8.0
+requests>=2.31

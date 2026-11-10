@@ -1,0 +1,21 @@
+# 运行时与缓存
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.pytest_tmp/
+pytest-of-*/
+
+# 覆盖率
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
