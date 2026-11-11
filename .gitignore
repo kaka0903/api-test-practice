@@ -19,3 +19,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# SQLite 数据文件
+app.db

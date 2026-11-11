@@ -1,23 +1,28 @@
 """极简「任务管理 API」。
 
+数据存在 SQLite（app.db）里，不再放内存——这样才能练习「接口说成功，
+去库里查证」这个真实测试动作。
+
 启动：
     uvicorn server:app --reload
 
-
+接口文档：
+    http://127.0.0.1:8000/docs
 """
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Day12 被测服务", version="1.0")
+import db
 
-# ---------- 内存数据 ----------
+app = FastAPI(title="Day12 被测服务", version="1.1")
+
+# 启动即重置数据库，保证每次测试都从确定状态开始
+db.init_db()
+
+# ---------- 账号与 token（不属于业务数据，放内存够用） ----------
 USERS = {"admin": "123456"}
 TOKENS = {}          # token -> username
-TASKS = [
-    {"id": 1, "title": "写测试用例", "done": False, "owner": "admin"},
-    {"id": 2, "title": "跑自动化", "done": True, "owner": "admin"},
-]
 
 
 def current_user(authorization: str) -> str:
@@ -26,6 +31,16 @@ def current_user(authorization: str) -> str:
     if token not in TOKENS:
         raise HTTPException(status_code=401, detail="未登录或 token 无效")
     return TOKENS[token]
+
+
+def to_api(row: dict) -> dict:
+    """数据库里的 done 是 0/1，转成 API 约定的布尔值。"""
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "done": bool(row["done"]),
+        "owner": row["owner"],
+    }
 
 
 # ---------- 请求体模型 ----------
@@ -63,28 +78,22 @@ def login(data: LoginIn):
 def list_tasks(authorization: str = Header(default="")):
     """查询任务列表，需要 Authorization: Bearer <token>。"""
     current_user(authorization)
-    return {"total": len(TASKS), "data": TASKS}
+    total, rows = db.list_tasks()
+    return {"total": total, "data": [to_api(r) for r in rows]}
 
 
 @app.post("/tasks", status_code=201)
 def create_task(data: TaskIn, authorization: str = Header(default="")):
     """新建任务，成功返回 201。"""
     owner = current_user(authorization)
-
-    task = {
-        "id": max([t["id"] for t in TASKS], default=0) + 1,
-        "title": data.title,
-        "done": data.done,
-        "owner": owner,
-    }
-    TASKS.append(task)
-    return task
+    row = db.create_task(data.title, data.done, owner)
+    return to_api(row)
 
 
 @app.get("/tasks/{task_id}")
 def get_task(task_id: int):
     """按 id 查任务；不存在返回 404，id 不是整数返回 422。"""
-    for t in TASKS:
-        if t["id"] == task_id:
-            return t
-    raise HTTPException(status_code=404, detail="任务不存在")
+    row = db.get_task(task_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return to_api(row)
